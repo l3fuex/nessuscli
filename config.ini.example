@@ -1,0 +1,4 @@
+[Nessus]
+url: https://localhost:8834
+accessKey: CHANGEME
+secretKey: CHANGEME
