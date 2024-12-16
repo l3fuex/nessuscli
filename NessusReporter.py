@@ -103,57 +103,56 @@ def get_scanid(folders, scans):
 
 def export_request(scanid):
     def build_params():
-        data = { "format": args.format }
-        data = data | { "chapters": args.type }
+        params = { "format": args.format }
+        params = params | { "chapters": args.type }
         for index, severity in enumerate(args.severity):
             match severity:
                 case "info":
-                    data = data | {
+                    params = params | {
                         f"filter.{index}.quality":"eq",
                         f"filter.{index}.filter":"severity",
                         f"filter.{index}.value":"0"
                     }
                 case "low":
-                    data = data | {
+                    params = params | {
                         f"filter.{index}.quality":"eq",
                         f"filter.{index}.filter":"severity",
                         f"filter.{index}.value":"1"
                     }
                 case "medium":
-                    data = data | {
+                    params = params | {
                         f"filter.{index}.quality":"eq",
                         f"filter.{index}.filter":"severity",
                         f"filter.{index}.value":"2"
                     }
                 case "high":
-                    data = data | {
+                    params = params | {
                         f"filter.{index}.quality":"eq",
                         f"filter.{index}.filter":"severity",
                         f"filter.{index}.value":"3"
                     }
                 case "critical":
-                    data = data | {
+                    params = params | {
                         f"filter.{index}.quality":"eq",
                         f"filter.{index}.filter":"severity",
                         f"filter.{index}.value":"4"
                     }
-        data = data | { "filter.search_type":"or" }
-
-        return data
+        params = params | { "filter.search_type":"or" }
+        
+        return parse.urlencode(params).encode("utf-8")
 
     url = f"{BASEURL}/scans/{scanid}/export"
     headers = {
         "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
     }
-    data = build_params()
+    params = build_params()
 
-    data_encoded = parse.urlencode(data).encode("utf-8")
 
     # TODO: Ignore SSL Certificate errors (disable in production environment)
     import ssl
     ssl_context = ssl._create_unverified_context()
 
-    req = request.Request(url, data=data_encoded, headers=headers, method="POST")
+    req = request.Request(url, data=params, headers=headers, method="POST")
     with request.urlopen(req, context=ssl_context) as response:
         data = json.loads(response.read().decode())
 
