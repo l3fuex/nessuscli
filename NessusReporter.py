@@ -39,6 +39,21 @@ parser.add_argument(
     help="Report format (defaults to \"pdf\")",
     default="pdf"
 )
+parser.add_argument(
+    "-t",
+    "--type",
+    choices=["vuln_hosts_summary", "vuln_by_host", "compliance_exec", "remediations", "vuln_by_plugin", "compliance"],
+    help="Report type (defaults to \"vuln_by_plugin\")",
+    default=["vuln_by_plugin"]
+)
+parser.add_argument(
+    "-s",
+    "--severity",
+    choices=["info", "low", "medium", "high", "critical"],
+    nargs="+",
+    help="Severity level(s) which should be included in the report",
+    default=["info", "low", "medium", "high", "critical"]
+)
 args = parser.parse_args()
 
 
@@ -86,22 +101,52 @@ def get_scanid(folders, scans):
     return scanid, status
 
 
-def export_request(scanid, fileformat):
+def export_request(scanid):
+    def build_params():
+        data = { "format": args.format }
+        data = data | { "chapters": args.type }
+        for index, severity in enumerate(args.severity):
+            match severity:
+                case "info":
+                    data = data | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"0"
+                    }
+                case "low":
+                    data = data | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"1"
+                    }
+                case "medium":
+                    data = data | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"2"
+                    }
+                case "high":
+                    data = data | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"3"
+                    }
+                case "critical":
+                    data = data | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"4"
+                    }
+        data = data | { "filter.search_type":"or" }
+
+        return data
+
     url = f"{BASEURL}/scans/{scanid}/export"
     headers = {
         "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
     }
-    data = {
-        "format":fileformat,
-        "chapters":"vuln_by_plugin",
-        "filter.0.quality":"eq",
-        "filter.0.filter":"severity",
-        "filter.0.value":"3",
-        "filter.1.quality":"eq",
-        "filter.1.filter":"severity",
-        "filter.1.value":"4",
-        "filter.search_type":"or",
-    }
+    data = build_params()
+
     data_encoded = parse.urlencode(data).encode("utf-8")
 
     # TODO: Ignore SSL Certificate errors (disable in production environment)
@@ -165,12 +210,12 @@ def main():
     scanid, scanstatus = get_scanid(folders, scans)
 
     # Check if scan is completed
-    if scanstatus != "completed":
-        logging.error("Scan is not completed!")
+    if scanstatus != "completed" and scanstatus != "imported":
+        logging.error("Scan status: \"%s\"", scanstatus)
         sys.exit(1)
 
     # Trigger report generation
-    token = export_request(scanid, args.format)
+    token = export_request(scanid)
 
     # Wait for report to be genereated
     while (filestatus := tokens_status(token)) == "loading":
@@ -180,7 +225,7 @@ def main():
     if filestatus == "ready":
         filename = tokens_download(token)
     else:
-        logging.error("Report generation aborted!")
+        logging.error("An error occured!")
         sys.exit(1)
 
 
