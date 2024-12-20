@@ -10,9 +10,10 @@ import configparser
 
 config = configparser.ConfigParser()
 config.read(Path(__file__).resolve().parent / "config.ini")
-BASEURL= config.get("Nessus", "url")
-ACCESSKEY= config.get("Nessus", "accessKey")
-SECRETKEY= config.get("Nessus", "secretKey")
+BASEURL = config.get("Nessus", "url")
+ACCESSKEY = config.get("Nessus", "accessKey")
+SECRETKEY = config.get("Nessus", "secretKey")
+APITOKEN = config.get("Nessus", "apiToken")
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
@@ -54,54 +55,63 @@ parser.add_argument(
     help="Severity level(s) which should be included in the report",
     default=["info", "low", "medium", "high", "critical"]
 )
+parser.add_argument(
+    "--diff",
+    help="Differnce between the last two scans",
+    action="store_true",
+)
 args = parser.parse_args()
 
 
-def list_scans():
+def scan_list():
+    # Build url and headers
     url = f"{BASEURL}/scans"
     headers = {
         "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}"
     }
 
-    # TODO: Ignore SSL Certificate errors (disable in production environment)
-    import ssl
-    ssl_context = ssl._create_unverified_context()
-
+    # Send request
     req = request.Request(url, headers=headers)
-    with request.urlopen(req, context=ssl_context) as response:
+    with request.urlopen(req) as response:
         data = json.loads(response.read().decode())
 
     return data["folders"], data["scans"]
 
 
-def get_scanid(folders, scans):
-    folderid = scanid = status = None
+def scan_details(scanid):
+    # Build url and headers
+    url = f"{BASEURL}/scans/{scanid}"
+    headers = {
+        "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
+    }
 
-    # Get folder ID
-    for folder in folders:
-        if folder["name"] == args.dir:
-            folderid = folder["id"]
+    # Send request
+    req = request.Request(url, headers=headers)
+    with request.urlopen(req) as response:
+        data = json.loads(response.read().decode())
 
-    if folderid is None:
-        logging.error("Folder <%s> does not exist!", args.dir)
-        sys.exit(1)
-
-    # Get scan ID in specified folder
-    for scan in scans:
-        if scan["name"] == args.name and scan["folder_id"] == folderid:
-            scanid = scan["id"]
-            status = scan["status"]
-
-    if scanid is None:
-        logging.error("Scan <%s> does not exist!", args.name)
-        sys.exit(1)
-
-    logging.debug("Scan ID is: \"%s\"", scanid)
-
-    return scanid, status
+    return data
 
 
-def export_request(scanid):
+def scan_diff(scanid, history):
+    # Build url and headers
+    url = f"{BASEURL}/scans/{scanid}/diff?history_id={history[1]}"
+    headers = {
+        "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
+        "X-Api-Token": f"{APITOKEN}"
+    }
+
+    # Build post parameters
+    params = { "diff_id": history[0] }
+    params = parse.urlencode(params).encode("utf-8")
+    print(params)
+
+    # Send request
+    req = request.Request(url, data=params, headers=headers, method="POST")
+    request.urlopen(req)
+
+
+def export_request(scanid, history=None):
     def build_params():
         params = { "format": args.format }
         params = params | { "chapters": args.type }
@@ -138,22 +148,20 @@ def export_request(scanid):
                         f"filter.{index}.value":"4"
                     }
         params = params | { "filter.search_type":"or" }
-        
+
         return parse.urlencode(params).encode("utf-8")
 
     url = f"{BASEURL}/scans/{scanid}/export"
+    if history:
+        url += f"?diff_id={history[0]}&history_id={history[1]}&limit=2500"
+
     headers = {
         "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
     }
     params = build_params()
 
-
-    # TODO: Ignore SSL Certificate errors (disable in production environment)
-    import ssl
-    ssl_context = ssl._create_unverified_context()
-
     req = request.Request(url, data=params, headers=headers, method="POST")
-    with request.urlopen(req, context=ssl_context) as response:
+    with request.urlopen(req) as response:
         data = json.loads(response.read().decode())
 
     return data["token"]
@@ -165,12 +173,8 @@ def tokens_status(token):
         "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
     }
 
-    # TODO: Ignore SSL Certificate errors (disable in production environment)
-    import ssl
-    ssl_context = ssl._create_unverified_context()
-
     req = request.Request(url, headers=headers)
-    with request.urlopen(req, context=ssl_context) as response:
+    with request.urlopen(req) as response:
         data = json.loads(response.read().decode())
 
     logging.info("Status: \"%s\"", data["status"])
@@ -184,12 +188,8 @@ def tokens_download(token):
         "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
     }
 
-    # TODO: Ignore SSL Certificate errors (disable in production environment)
-    import ssl
-    ssl_context = ssl._create_unverified_context()
-
     req = request.Request(url, headers=headers)
-    with request.urlopen(req, context=ssl_context) as response:
+    with request.urlopen(req) as response:
 
         filename = response.getheader("Content-Disposition")
         filename = filename.split("filename=")[-1].strip("\"'")
@@ -203,9 +203,36 @@ def tokens_download(token):
     return filename
 
 
+def get_scanid(folders, scans):
+    folderid = scanid = status = None
+
+    # Get folder ID
+    for folder in folders:
+        if folder["name"] == args.dir:
+            folderid = folder["id"]
+
+    if folderid is None:
+        logging.error("Folder <%s> does not exist!", args.dir)
+        sys.exit(1)
+
+    # Get scan ID in specified folder
+    for scan in scans:
+        if scan["name"] == args.name and scan["folder_id"] == folderid:
+            scanid = scan["id"]
+            status = scan["status"]
+
+    if scanid is None:
+        logging.error("Scan <%s> does not exist!", args.name)
+        sys.exit(1)
+
+    logging.debug("Scan ID is: \"%s\"", scanid)
+
+    return scanid, status
+
+
 def main():
     # Get scan ID
-    folders, scans = list_scans()
+    folders, scans = scan_list()
     scanid, scanstatus = get_scanid(folders, scans)
 
     # Check if scan is completed
@@ -213,8 +240,22 @@ def main():
         logging.error("Scan status: \"%s\"", scanstatus)
         sys.exit(1)
 
+    history = []
+    if args.diff:
+        # Get history IDs
+        details = scan_details(scanid)
+        count = len(details["history"])
+        if count <= 1:
+            logging.error("There is only one scan history - diff not possible!")
+            sys.exit()
+        history.append(int(details["history"][count-1]["history_id"]))
+        history.append(int(details["history"][count-2]["history_id"]))
+
+        # Create diff
+        scan_diff(scanid, history)
+
     # Trigger report generation
-    token = export_request(scanid)
+    token = export_request(scanid, history)
 
     # Wait for report to be genereated
     while (filestatus := tokens_status(token)) == "loading":
