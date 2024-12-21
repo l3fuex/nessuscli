@@ -14,11 +14,10 @@ logging.basicConfig(
 
 
 class NessusAPI:
-    def __init__(self, baseurl, accesskey, secretkey, apitoken):
+    def __init__(self, baseurl, accesskey, secretkey):
         self.baseurl = baseurl
         self.accesskey = accesskey
         self.secretkey = secretkey
-        self.apitoken = apitoken
 
 
     def scan_list(self):
@@ -145,8 +144,7 @@ def report(args, config):
     api = NessusAPI(
         config.get("Nessus", "url"),
         config.get("Nessus", "accessKey"),
-        config.get("Nessus", "secretKey"),
-        config.get("Nessus", "apiToken")
+        config.get("Nessus", "secretKey")
     )
 
     # Extract scan ID for given name
