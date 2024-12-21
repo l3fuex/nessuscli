@@ -8,8 +8,8 @@ from pathlib import Path
 import configparser
 
 logging.basicConfig(
-    level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
-#    level=logging.INFO, format="%(levelname)-8s %(message)s"
+#    level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
+    level=logging.INFO, format="%(levelname)-8s %(message)s"
 )
 
 
