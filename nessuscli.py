@@ -41,18 +41,6 @@ class NessusAPI:
         return data
 
 
-    def scan_diff(self, scanid, history):
-        url = f"{self.baseurl}/scans/{scanid}/diff?history_id={history[1]}"
-        headers = {
-            "X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}",
-            "X-Api-Token": f"{self.apitoken}"
-        }
-
-        params = { "diff_id": history[0] }
-
-        self._send_request(url, headers=headers, data=params, method="POST")
-
-
     def export_request(self, scanid, reportformat, reporttype, severity, history=None):
         url = f"{self.baseurl}/scans/{scanid}/export"
         if history:
@@ -187,21 +175,8 @@ def report(args, config):
         logging.error("Scan is still running!")
         sys.exit(1)
 
-    # Creat diff, if necessary
-    history = []
-    if args.diff:
-        details = api.scan_details(scanid)
-        count = len(details["history"])
-        if count <= 1:
-            logging.error("There is only one scan history - diff not possible!")
-            sys.exit()
-        history.append(int(details["history"][count-1]["history_id"]))
-        history.append(int(details["history"][count-2]["history_id"]))
-
-        api.scan_diff(scanid, history)
-
     # Trigger report generation
-    token, _ = api.export_request(scanid, args.format, args.type, args.severity, history)
+    token, _ = api.export_request(scanid, args.format, args.type, args.severity)
 
     # Wait for report to be genereated
     while True:
@@ -221,6 +196,21 @@ def report(args, config):
 
 
 def main():
+    def severity_type_handler(value):
+        valid_severities = ["info", "low", "medium", "high", "critical"]
+        severities = value.split(",")
+        # Input validation
+        for severity in severities:
+            if severity not in valid_severities:
+                raise argparse.ArgumentTypeError(
+                    f"invalid choice: \'{severity}\' (choose from {", ".join(f'\'{item}\'' for item in valid_severities)})"
+                )
+        # Remove duplicates
+        severities = list(dict.fromkeys(severities))
+
+        return severities
+
+
     # Read config.ini file
     config = configparser.ConfigParser()
     config.read(Path(__file__).resolve().parent / "config.ini")
@@ -230,11 +220,11 @@ def main():
     subparsers = parser.add_subparsers(required=True)
 
     # Define arguments for "report" option
-    report_parser = subparsers.add_parser("report")
+    report_parser = subparsers.add_parser("report", help="Generates reports from completed scans")
     report_parser.add_argument(
-        "--name",
-        help="Scan name to genereate report from",
-        required=True
+        "name",
+        type=str,
+        help="Scan name",
     )
     report_parser.add_argument(
         "--dir",
@@ -255,18 +245,11 @@ def main():
     )
     report_parser.add_argument(
         "--severity",
-        choices=["info", "low", "medium", "high", "critical"],
-        nargs="+",
-        help="Specify relevant severity level(s)",
+        help="Specify relevant severity level",
+        type=severity_type_handler,
         default=["info", "low", "medium", "high", "critical"]
     )
-    report_parser.add_argument(
-        "--diff",
-        help="Show only the differences of the last two scans in the report",
-        action="store_true"
-    )
     report_parser.set_defaults(func=report)
-
 
     # Function call
     args = parser.parse_args()
