@@ -21,133 +21,157 @@ logging.basicConfig(
 )
 
 
-def scan_list():
-    url = f"{BASEURL}/scans"
-    headers = { "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}" }
-
-    data, _ = api_call(url, headers=headers, method="GET")
-    data = json.loads(data.decode())
-
-    return data["folders"], data["scans"]
+class NessusAPI:
+    def __init__(self, baseurl, accesskey, secretkey, apitoken):
+        self.baseurl = baseurl
+        self.accesskey = accesskey
+        self.secretkey = secretkey
+        self.apitoken = apitoken
 
 
-def scan_details(scanid):
-    url = f"{BASEURL}/scans/{scanid}"
-    headers = { "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}" }
+    def scan_list(self):
+        url = f"{self.baseurl}/scans"
+        headers = { "X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}" }
 
-    data, _ = api_call(url, headers=headers, method="GET")
-    data = json.loads(data.decode())
+        data, _ = self._send_request(url, headers=headers)
+        data = json.loads(data.decode())
 
-    return data
-
-
-def scan_diff(scanid, history):
-    url = f"{BASEURL}/scans/{scanid}/diff?history_id={history[1]}"
-    headers = {
-        "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}",
-        "X-Api-Token": f"{APITOKEN}"
-    }
-
-    params = { "diff_id": history[0] }
-    params = parse.urlencode(params).encode("utf-8")
-
-    api_call(url, headers=headers, params=params, method="POST")
+        return data["folders"], data["scans"]
 
 
-def export_request(scanid, repformat, reptype, severity, history=None):
-    url = f"{BASEURL}/scans/{scanid}/export"
-    if history:
-        url += f"?diff_id={history[0]}&history_id={history[1]}&limit=2500"
+    def scan_details(self, scanid):
+        url = f"{self.baseurl}/scans/{scanid}"
+        headers = { "X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}" }
 
-    headers = { "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}" }
+        data, _ = self._send_request(url, headers=headers)
+        data = json.loads(data.decode())
 
-    params = { "format": repformat }
-    params = params | { "chapters": reptype }
-    for index, value in enumerate(severity):
-        match value:
-            case "info":
-                params = params | {
-                    f"filter.{index}.quality":"eq",
-                    f"filter.{index}.filter":"severity",
-                    f"filter.{index}.value":"0"
-                }
-            case "low":
-                params = params | {
-                    f"filter.{index}.quality":"eq",
-                    f"filter.{index}.filter":"severity",
-                    f"filter.{index}.value":"1"
-                }
-            case "medium":
-                params = params | {
-                    f"filter.{index}.quality":"eq",
-                    f"filter.{index}.filter":"severity",
-                    f"filter.{index}.value":"2"
-                }
-            case "high":
-                params = params | {
-                    f"filter.{index}.quality":"eq",
-                    f"filter.{index}.filter":"severity",
-                    f"filter.{index}.value":"3"
-                }
-            case "critical":
-                params = params | {
-                    f"filter.{index}.quality":"eq",
-                    f"filter.{index}.filter":"severity",
-                    f"filter.{index}.value":"4"
-                }
-    params = params | { "filter.search_type":"or" }
-    params = parse.urlencode(params).encode("utf-8")
-
-    data, _ = api_call(url, headers=headers, params=params, method="POST")
-    data = json.loads(data.decode())
-
-    return data["token"], data["file"]
+        return data
 
 
-def token_status(token):
-    url = f"{BASEURL}/tokens/{token}/status"
-    headers = { "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}" }
+    def scan_diff(self, scanid, history):
+        url = f"{self.baseurl}/scans/{scanid}/diff?history_id={history[1]}"
+        headers = {
+            "X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}",
+            "X-Api-Token": f"{self.apitoken}"
+        }
 
-    data, _ = api_call(url, headers=headers, method="GET")
-    data = json.loads(data.decode())
+        params = { "diff_id": history[0] }
 
-    return data["error"], data["message"], data["status"]
-
-
-def token_download(token, filepath=None, filename=None):
-    url = f"{BASEURL}/tokens/{token}/download"
-    reqheaders = { "X-ApiKeys": f"accessKey={ACCESSKEY}; secretKey={SECRETKEY}" }
-
-    data, resheaders = api_call(url, headers=reqheaders, method="GET")
-
-    if filename is None:
-        for header, value in resheaders:
-            if header == "Content-Disposition":
-                filename = value.split("filename=")[-1]
-                filename = filename.strip("\"'")
-
-    if filepath is None:
-        filepath = Path(__file__).resolve().parent
-
-    abspath = filepath / filename
-    with open(abspath, "wb") as file:
-        file.write(data)
-
-    return abspath
+        self._send_request(url, headers=headers, data=params, method="POST")
 
 
-def api_call(url, headers=None, params=None, method="GET"):
-    req = request.Request(url, headers=headers, method=method, data=params)
-    with request.urlopen(req) as response:
-        response_data = response.read()
-        response_headers = response.getheaders()
-    return response_data, response_headers
+    def export_request(self, scanid, reportformat, reporttype, severity, history=None):
+        url = f"{self.baseurl}/scans/{scanid}/export"
+        if history:
+            url += f"?diff_id={history[0]}&history_id={history[1]}&limit=2500"
+
+        headers = { "X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}" }
+
+        params = { "format": reportformat }
+        params = params | { "chapters": reporttype }
+        for index, value in enumerate(severity):
+            match value:
+                case "info":
+                    params = params | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"0"
+                    }
+                case "low":
+                    params = params | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"1"
+                    }
+                case "medium":
+                    params = params | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"2"
+                    }
+                case "high":
+                    params = params | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"3"
+                    }
+                case "critical":
+                    params = params | {
+                        f"filter.{index}.quality":"eq",
+                        f"filter.{index}.filter":"severity",
+                        f"filter.{index}.value":"4"
+                    }
+        params = params | { "filter.search_type":"or" }
+
+        data, _ = self._send_request(url, headers=headers, data=params, method="POST")
+        data = json.loads(data.decode())
+
+        return data["token"], data["file"]
 
 
-def nessus_report(args):
-    folders, scans = scan_list()
+    def token_status(self, token):
+        url = f"{self.baseurl}/tokens/{token}/status"
+        headers = {"X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}"}
 
-    # Get folder ID
+        data, _ = self._send_request(url, headers)
+        data = json.loads(data.decode())
+
+        return data["error"], data["message"], data["status"]
+
+
+    def token_download(self, token, filepath=None, filename=None):
+        url = f"{self.baseurl}/tokens/{token}/download"
+        headers = {"X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}"}
+
+        data, headers = self._send_request(url, headers)
+
+        # If filename does not exist, parse filename from HTTP header
+        if filename is None:
+            for header, value in headers:
+                if header == "Content-Disposition":
+                    filename = value.split("filename=")[-1]
+                    filename = filename.strip("\"'")
+
+        # If filepath does not exist, take the program directory as filepath
+        if filepath is None:
+            filepath = Path(__file__).resolve().parent
+
+        abspath = filepath / filename
+        with open(abspath, "wb") as file:
+            file.write(data)
+
+        return abspath
+
+
+    def _send_request(self, url, headers=None, data=None, method="GET"):
+        logging.debug("%s %s", method, url)
+
+        # URL encode POST data
+        if data:
+            logging.debug("DATA: %s", data)
+            data = parse.urlencode(data).encode("utf-8")
+
+        # Send request
+        req = request.Request(url, headers=headers, data=data, method=method)
+        with request.urlopen(req) as response:
+            response_data = response.read()
+            response_headers = response.getheaders()
+
+        return response_data, response_headers
+
+
+def report(args, config):
+    api = NessusAPI(
+        config.get("Nessus", "url"),
+        config.get("Nessus", "accessKey"),
+        config.get("Nessus", "secretKey"),
+        config.get("Nessus", "apiToken")
+    )
+
+    # Extract scan ID for given name
+    folders, scans = api.scan_list()
+
     folderid = None
     for folder in folders:
         if folder["name"] == args.dir:
@@ -157,7 +181,6 @@ def nessus_report(args):
         logging.error("Folder \"%s\" does not exist!", args.dir)
         sys.exit(1)
 
-    # Get scan ID and status
     scanid = status = None
     for scan in scans:
         if scan["name"] == args.name and scan["folder_id"] == folderid:
@@ -168,7 +191,6 @@ def nessus_report(args):
         logging.error("Scan \"%s\" does not exist!", args.name)
         sys.exit(1)
 
-    # Check if scan is completed
     if status == "running":
         logging.error("Scan is still running!")
         sys.exit(1)
@@ -176,7 +198,7 @@ def nessus_report(args):
     # Creat diff, if necessary
     history = []
     if args.diff:
-        details = scan_details(scanid)
+        details = api.scan_details(scanid)
         count = len(details["history"])
         if count <= 1:
             logging.error("There is only one scan history - diff not possible!")
@@ -184,14 +206,14 @@ def nessus_report(args):
         history.append(int(details["history"][count-1]["history_id"]))
         history.append(int(details["history"][count-2]["history_id"]))
 
-        scan_diff(scanid, history)
+        api.scan_diff(scanid, history)
 
     # Trigger report generation
-    token, _ = export_request(scanid, args.format, args.type, args.severity, history)
+    token, _ = api.export_request(scanid, args.format, args.type, args.severity, history)
 
     # Wait for report to be genereated
     while True:
-        _ , message, status = token_status(token)
+        _ , message, status = api.token_status(token)
         logging.info("[%s] %s", status, message)
         if status != "loading":
             break
@@ -199,7 +221,7 @@ def nessus_report(args):
 
     # Download report
     if status == "ready":
-        abspath = token_download(token)
+        abspath = api.token_download(token)
         logging.info("Download finished! >> \"%s\"", abspath)
     else:
         logging.error("An error occured!")
@@ -207,14 +229,19 @@ def nessus_report(args):
 
 
 def main():
+    # Read config.ini file
+    config = configparser.ConfigParser()
+    config.read(Path(__file__).resolve().parent / "config.ini")
+
+    # Create argumet parser and subparsers
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(required=True)
 
-    # Subparser for "report" argument
+    # Define arguments for "report" option
     report_parser = subparsers.add_parser("report")
     report_parser.add_argument(
         "--name",
-        help="Scan name",
+        help="Scan name to genereate report from",
         required=True
     )
     report_parser.add_argument(
@@ -243,13 +270,15 @@ def main():
     )
     report_parser.add_argument(
         "--diff",
-        help="Shows only the differences of the last two scans in the report",
-        action="store_true",
+        help="Show only the differences of the last two scans in the report",
+        action="store_true"
     )
-    report_parser.set_defaults(func=nessus_report)
+    report_parser.set_defaults(func=report)
 
+
+    # Function call
     args = parser.parse_args()
-    args.func(args)
+    args.func(args, config)
 
 
 if __name__ == "__main__":
