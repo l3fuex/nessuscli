@@ -7,14 +7,6 @@ import time
 from pathlib import Path
 import configparser
 
-
-config = configparser.ConfigParser()
-config.read(Path(__file__).resolve().parent / "config.ini")
-BASEURL = config.get("Nessus", "url")
-ACCESSKEY = config.get("Nessus", "accessKey")
-SECRETKEY = config.get("Nessus", "secretKey")
-APITOKEN = config.get("Nessus", "apiToken")
-
 logging.basicConfig(
     level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
 #    level=logging.INFO, format="%(levelname)-8s %(message)s"
