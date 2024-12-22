@@ -30,8 +30,8 @@ class NessusAPI:
         return data["folders"], data["scans"]
 
 
-    def scan_details(self, scanid):
-        url = f"{self.baseurl}/scans/{scanid}"
+    def scan_details(self, scanid, limit=1):
+        url = f"{self.baseurl}/scans/{scanid}?limit={limit}"
         headers = { "X-ApiKeys": f"accessKey={self.accesskey}; secretKey={self.secretkey}" }
 
         data, _ = self._send_request(url, headers=headers)
@@ -140,6 +140,29 @@ class NessusAPI:
         return response_data, response_headers
 
 
+def get_scanid(dirname, scanname, dirs, scans):
+    folderid = None
+    for d in dirs:
+        if d["name"] == dirname:
+            folderid = d["id"]
+
+    if folderid is None:
+        logging.error("Folder \"%s\" does not exist!", dirname)
+        sys.exit(1)
+
+    scanid = status = None
+    for s in scans:
+        if s["name"] == scanname and s["folder_id"] == folderid:
+            scanid = s["id"]
+            status = s["status"]
+
+    if scanid is None or status is None:
+        logging.error("Scan \"%s\" does not exist!", scanname)
+        sys.exit(1)
+
+    return scanid, status
+
+
 def report(args, config):
     api = NessusAPI(
         config.get("Nessus", "url"),
@@ -147,27 +170,9 @@ def report(args, config):
         config.get("Nessus", "secretKey")
     )
 
-    # Extract scan ID for given name
+    # Get scan ID for given name
     folders, scans = api.scan_list()
-
-    folderid = None
-    for folder in folders:
-        if folder["name"] == args.dir:
-            folderid = folder["id"]
-
-    if folderid is None:
-        logging.error("Folder \"%s\" does not exist!", args.dir)
-        sys.exit(1)
-
-    scanid = status = None
-    for scan in scans:
-        if scan["name"] == args.name and scan["folder_id"] == folderid:
-            scanid = scan["id"]
-            status = scan["status"]
-
-    if scanid is None or status is None:
-        logging.error("Scan \"%s\" does not exist!", args.name)
-        sys.exit(1)
+    scanid, status = get_scanid(args.dir, args.name, folders, scans)
 
     if status == "running":
         logging.error("Scan is still running!")
@@ -191,6 +196,31 @@ def report(args, config):
     else:
         logging.error("An error occured!")
         sys.exit(1)
+
+
+def scan(args, config):
+    api = NessusAPI(
+        config.get("Nessus", "url"),
+        config.get("Nessus", "accessKey"),
+        config.get("Nessus", "secretKey")
+    )
+
+    # Get scan ID for given name
+    folders, scans = api.scan_list()
+    scanid, status = get_scanid(args.dir, args.name, folders, scans)
+
+    if args.status:
+        print(f"{status}")
+
+    if args.last_scanned:
+        details = api.scan_details(scanid)
+
+        ts = "N/A"
+        if "scan_end_timestamp" in details["info"]:
+            ts = int(details["info"]["scan_end_timestamp"])
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(ts))
+
+        print(f"{ts}")
 
 
 def main():
@@ -248,6 +278,31 @@ def main():
         default=["info", "low", "medium", "high", "critical"]
     )
     report_parser.set_defaults(func=report)
+
+    # Define arguments for "scan" option
+    scan_parser = subparsers.add_parser("scan", help="Get information about scans")
+    scan_parser.add_argument(
+        "name",
+        type=str,
+        help="Scan name",
+    )
+    scan_parser.add_argument(
+        "--dir",
+        help="Scan directory",
+        default="My Scans"
+    )
+    group = scan_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--status",
+        help="Shows the status of a scan",
+        action="store_true"
+    )
+    group.add_argument(
+        "--last-scanned",
+        help="Timestamp of last scan (UTC)",
+        action="store_true"
+    )
+    scan_parser.set_defaults(func=scan)
 
     # Function call
     args = parser.parse_args()
