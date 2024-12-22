@@ -1,6 +1,5 @@
 import argparse
 import logging
-import sys
 import json
 from urllib import request, parse
 import time
@@ -148,7 +147,7 @@ def get_scanid(dirname, scanname, dirs, scans):
 
     if folderid is None:
         logging.error("Folder \"%s\" does not exist!", dirname)
-        sys.exit(1)
+        raise SystemExit(1)
 
     scanid = status = None
     for s in scans:
@@ -158,16 +157,16 @@ def get_scanid(dirname, scanname, dirs, scans):
 
     if scanid is None or status is None:
         logging.error("Scan \"%s\" does not exist!", scanname)
-        sys.exit(1)
+        raise SystemExit(1)
 
     return scanid, status
 
 
 def report(args, config):
     api = NessusAPI(
-        config.get("Nessus", "url"),
-        config.get("Nessus", "accessKey"),
-        config.get("Nessus", "secretKey")
+        config.get("API", "url"),
+        config.get("API", "accessKey"),
+        config.get("API", "secretKey")
     )
 
     # Get scan ID for given name
@@ -176,7 +175,7 @@ def report(args, config):
 
     if status == "running":
         logging.error("Scan is still running!")
-        sys.exit(1)
+        raise SystemExit(1)
 
     # Trigger report generation
     token, _ = api.export_request(scanid, args.format, args.type, args.severity)
@@ -192,17 +191,18 @@ def report(args, config):
     # Download report
     if status == "ready":
         abspath = api.token_download(token)
-        logging.info("Download finished! >> \"%s\"", abspath)
+        logging.info("Download finished!")
+        print(abspath)
     else:
         logging.error("An error occured!")
-        sys.exit(1)
+        raise SystemExit(1)
 
 
 def scan(args, config):
     api = NessusAPI(
-        config.get("Nessus", "url"),
-        config.get("Nessus", "accessKey"),
-        config.get("Nessus", "secretKey")
+        config.get("API", "url"),
+        config.get("API", "accessKey"),
+        config.get("API", "secretKey")
     )
 
     # Get scan ID for given name
@@ -215,12 +215,10 @@ def scan(args, config):
     if args.last_scanned:
         details = api.scan_details(scanid)
 
-        ts = "N/A"
         if "scan_end_timestamp" in details["info"]:
             ts = int(details["info"]["scan_end_timestamp"])
             ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(ts))
-
-        print(f"{ts}")
+            print(f"{ts}")
 
 
 def main():
@@ -252,7 +250,7 @@ def main():
     report_parser.add_argument(
         "name",
         type=str,
-        help="Scan name",
+        help="Scan name"
     )
     report_parser.add_argument(
         "--dir",
@@ -273,7 +271,7 @@ def main():
     )
     report_parser.add_argument(
         "--severity",
-        help="Specify relevant severity level",
+        help="Specify relevant severity level(s)",
         type=severity_type_handler,
         default=["info", "low", "medium", "high", "critical"]
     )
@@ -284,7 +282,7 @@ def main():
     scan_parser.add_argument(
         "name",
         type=str,
-        help="Scan name",
+        help="Scan name"
     )
     scan_parser.add_argument(
         "--dir",

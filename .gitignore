@@ -11,3 +11,4 @@ config.ini
 *.csv
 *.nessus
 *.xml
+.tmp_*

@@ -1,4 +1,10 @@
-[Nessus]
+[API]
 url: https://localhost:8834
 accessKey: CHANGEME
 secretKey: CHANGEME
+
+[SMTP]
+server: smtp.example.com
+port: 25
+from_addr: nessus@example.com
+rcpt_addr: john@example.com
