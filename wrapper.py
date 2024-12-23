@@ -71,7 +71,7 @@ def wrapper(args):
     ts1 = calendar.timegm(date_struct)
 
     # Build filename for state file
-    md5hash = hashlib.md5(args.name.encode()).hexdigest()
+    md5hash = hashlib.md5((args.dir + args.name).encode()).hexdigest()
     filename = Path(__file__).resolve().parent / f".tmp_{md5hash}"
 
     # If current timestamp and state file timestamp match, do nothing
