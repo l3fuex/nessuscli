@@ -48,16 +48,30 @@ def send_mail(attachments):
             server.starttls()
             server.send_message(msg)
             logging.info("Mail sent!")
+    except smtplib.SMTPAuthenticationError as e:
+        logging.error("Authentication error: %s", e)
+    except smtplib.SMTPConnectError as e:
+        logging.error("Connection error: %s", e)
+    except smtplib.SMTPRecipientsRefused as e:
+        logging.error("All recipients were refused: %s", e)
+    except smtplib.SMTPException as e:
+        logging.error("SMTP error: %s", e)
     except Exception as e:
-        logging.error("Error while attmepting to send email: %s", e)
+        logging.error("Unexpected error: %s", e)
 
 
 def wrapper(args):
     # Get timestamp of last scan
     cmd = ["python3", "nessuscli.py", "scan", args.name, "--last-scanned"]
     logging.debug("Executing <%s>", " ".join(cmd))
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    logging.debug("Output: %s", result.stdout.strip())
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logging.debug("Output: %s", result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        logging.error("Command failed: %s", e.stderr.strip())
+    except Exception as e:
+        logging.error("Unexpected error while executing command: %s", e)
 
     # Check stdout for correct date format (e.g. 2024-01-01 06:00:00)
     pattern = r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
@@ -76,7 +90,7 @@ def wrapper(args):
 
     # If current timestamp and state file timestamp match, do nothing
     if filename.exists():
-        with open(filename, "r") as file:
+        with open(filename, "r", encoding="utf-8") as file:
             ts2 = int(file.read())
 
         if ts1 == ts2:
@@ -88,15 +102,21 @@ def wrapper(args):
     for file_format in args.format:
         cmd = ["python3", "nessuscli.py", "report", args.name, "--format", file_format, "--severity", ",".join(args.severity)]
         logging.debug("Executing <%s>", " ".join(cmd))
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        logging.debug("Output: %s", result.stdout.strip())
-        attachments.append(result.stdout.strip())
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            logging.debug("Output: %s", result.stdout.strip())
+            attachments.append(result.stdout.strip())
+        except subprocess.CalledProcessError as e:
+            logging.error("Command failed: %s", e.stderr.strip())
+        except Exception as e:
+            logging.error("Unexpected error while executing command: %s", e)
 
     # Send mail
     send_mail(attachments)
 
     # Write timestamp in state file
-    with open(filename, "w") as file:
+    with open(filename, "w", encoding="utf-8") as file:
         file.write(str(ts1))
 
 
