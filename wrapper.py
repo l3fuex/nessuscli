@@ -36,7 +36,7 @@ def send_mail(attachments):
 
     for attachment in attachments:
         file_path = Path(attachment).resolve()
-        mimetype, _ = mimetypes.guess_file_type(file_path)
+        mimetype, _ = mimetypes.guess_type(file_path)
         maintype, subtype = mimetype.split("/")
         logging.debug("Attaching file \"%s\" with mimetype \"%s\" and subtype \"%s\"", file_path.name, mimetype, subtype)
         with open(file_path, "rb") as file:
