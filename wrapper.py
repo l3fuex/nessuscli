@@ -61,8 +61,10 @@ def send_mail(attachments):
 
 
 def wrapper(args):
+    nessuscli = Path(__file__).resolve().parent / "nessuscli.py"
+
     # Get timestamp of last scan
-    cmd = ["python3", "nessuscli.py", "scan", args.name, "--last-scanned"]
+    cmd = ["python3", str(nessuscli.resolve()), "scan", args.name, "--last-scanned"]
     logging.debug("Executing <%s>", " ".join(cmd))
 
     try:
@@ -100,7 +102,7 @@ def wrapper(args):
     # If state file does not exist or timestamps did not match, generate report
     attachments = []
     for file_format in args.format:
-        cmd = ["python3", "nessuscli.py", "report", args.name, "--format", file_format, "--severity", ",".join(args.severity)]
+        cmd = ["python3", str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity)]
         logging.debug("Executing <%s>", " ".join(cmd))
 
         try:
