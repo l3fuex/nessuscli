@@ -222,19 +222,17 @@ def scan(args, config):
 
 
 def main():
-    def severity_type_handler(value):
-        valid_severities = ["info", "low", "medium", "high", "critical"]
-        severities = value.split(",")
-        # Input validation
-        for severity in severities:
-            if severity not in valid_severities:
-                raise argparse.ArgumentTypeError(
-                    f"invalid choice: \'{severity}\' (choose from {", ".join(f'\'{item}\'' for item in valid_severities)})"
-                )
-        # Remove duplicates
-        severities = list(dict.fromkeys(severities))
-
-        return severities
+    def create_type_handler(allowed_values):
+        def type_handler(value):
+            values = value.split(",")
+            # Check for valid values
+            for value in values:
+                if value not in allowed_values:
+                    raise argparse.ArgumentTypeError(
+                        f"invalid choice: \'{value}\' (choose from {", ".join(f'\'{item}\'' for item in allowed_values)})"
+                    )
+            return set(values)
+        return type_handler
 
 
     # Read config.ini file
@@ -272,7 +270,7 @@ def main():
     report_parser.add_argument(
         "--severity",
         help="Specify relevant severity level(s)",
-        type=severity_type_handler,
+        type=create_type_handler(["info", "low", "medium", "high", "critical"]),
         default=["info", "low", "medium", "high", "critical"]
     )
     report_parser.set_defaults(func=report)
