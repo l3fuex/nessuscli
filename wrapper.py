@@ -126,7 +126,7 @@ def wrapper(args):
     with open(statefile, "w", encoding="utf-8") as file:
         file.write(str(ts1))
 
-    # Delete reports
+    # Delete local reports
     if args.preserve is False:
         for attachement in attachments:
             filepath = Path(attachement)
