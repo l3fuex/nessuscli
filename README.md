@@ -10,7 +10,6 @@ The program can be executed on any host in the network - it is not neccessary to
 - Python >= 3.10
 
 ## Installation
-
 ```bash
 # Copy the code to your machine
 git clone https://github.com/l3fuex/nessuscli
