@@ -90,7 +90,6 @@ def wrapper(args):
     # Build filename for report file
     reportfile = re.sub(r"\s+", "_", args.name)
     reportfile = f"{time.strftime("%Y-%m-%d", date_struct)}_{reportfile}"
-    print(reportfile)
 
     # Build filename for state file
     md5hash = hashlib.md5((args.scandir + args.name).encode()).hexdigest()
@@ -126,6 +125,19 @@ def wrapper(args):
     # Write timestamp in state file
     with open(statefile, "w", encoding="utf-8") as file:
         file.write(str(ts1))
+
+    # Delete reports
+    if args.preserve is False:
+        for attachement in attachments:
+            filepath = Path(attachement)
+            try:
+                filepath.unlink()
+            except FileNotFoundError:
+                logging.error("Could not delete file <%s> - file not found!", filepath)
+            except PermissionError:
+                logging.error("Could not delete file <%s> - permission denied!", filepath)
+            except Exception as e:
+                logging.error("Could not delete file <%s> - unkown error: %s", filepath, e)
 
 
 def main():
@@ -169,6 +181,11 @@ def main():
         help="Specify relevant severity level(s)",
         type=create_type_handler(["info", "low", "medium", "high", "critical"]),
         default=["info", "low", "medium", "high", "critical"]
+    )
+    parser.add_argument(
+        "--preserve",
+        help="Keep a local copy of the report file",
+        action="store_true"
     )
     args = parser.parse_args()
 
