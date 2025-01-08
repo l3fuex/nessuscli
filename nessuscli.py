@@ -104,16 +104,28 @@ class NessusAPI:
 
         data, headers = self._send_request(url, headers)
 
-        # If filename does not exist, parse filename from HTTP header
-        if filename is None:
-            for header, value in headers:
-                if header == "Content-Disposition":
-                    filename = value.split("filename=")[-1]
-                    filename = filename.strip("\"'")
+        # Parse filename from HTTP header
+        for header, value in headers:
+            if header.lower() == "content-disposition":
+                header_filename = value.split("filename=")[-1].strip("\"'")
+                header_filename = Path(header_filename)
 
-        # If filepath does not exist, take the program directory as filepath
+        # Build filename
+        if filename is None:
+            filename = header_filename.name
+        else:
+            filename = filename + header_filename.suffix
+
+        # Build filepath
         if filepath is None:
             filepath = Path(__file__).resolve().parent
+        else:
+            filepath = Path(filepath)
+        
+        # Check if path is valid
+        if not filepath.is_dir():
+            logging.error("Folder \"%s\" does not exist!", filepath)
+            raise SystemExit(1)
 
         abspath = filepath / filename
         with open(abspath, "wb") as file:
@@ -171,7 +183,7 @@ def report(args, config):
 
     # Get scan ID for given name
     folders, scans = api.scan_list()
-    scanid, status = get_scanid(args.dir, args.name, folders, scans)
+    scanid, status = get_scanid(args.scandir, args.name, folders, scans)
 
     if status != "completed":
         logging.error("Scan is not completed yet!")
@@ -190,7 +202,7 @@ def report(args, config):
 
     # Download report
     if status == "ready":
-        abspath = api.token_download(token)
+        abspath = api.token_download(token, filepath=args.filepath, filename=args.filename)
         logging.info("Download finished!")
         print(abspath)
     else:
@@ -207,7 +219,7 @@ def scan(args, config):
 
     # Get scan ID for given name
     folders, scans = api.scan_list()
-    scanid, status = get_scanid(args.dir, args.name, folders, scans)
+    scanid, status = get_scanid(args.scandir, args.name, folders, scans)
 
     if args.status:
         print(f"{status}")
@@ -251,7 +263,7 @@ def main():
         help="Scan name"
     )
     report_parser.add_argument(
-        "--dir",
+        "--scandir",
         help="Scan directory",
         default="My Scans"
     )
@@ -273,6 +285,16 @@ def main():
         type=create_type_handler(["info", "low", "medium", "high", "critical"]),
         default=["info", "low", "medium", "high", "critical"]
     )
+    report_parser.add_argument(
+        "--filename",
+        help="Filename to be used for report",
+        default=None
+    )
+    report_parser.add_argument(
+        "--filepath",
+        help="Filepath to directory where report should be saved",
+        default=None
+    )
     report_parser.set_defaults(func=report)
 
     # Define arguments for "scan" option
@@ -283,7 +305,7 @@ def main():
         help="Scan name"
     )
     scan_parser.add_argument(
-        "--dir",
+        "--scandir",
         help="Scan directory",
         default="My Scans"
     )

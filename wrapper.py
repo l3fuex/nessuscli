@@ -10,6 +10,7 @@ from email.message import EmailMessage
 import mimetypes
 import logging
 import configparser
+import sys
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
@@ -64,7 +65,7 @@ def wrapper(args):
     nessuscli = Path(__file__).resolve().parent / "nessuscli.py"
 
     # Get timestamp of last scan
-    cmd = ["python3", str(nessuscli.resolve()), "scan", args.name, "--last-scanned"]
+    cmd = [sys.executable, str(nessuscli.resolve()), "scan", args.name, "--last-scanned"]
     logging.debug("Executing <%s>", " ".join(cmd))
 
     try:
@@ -86,13 +87,18 @@ def wrapper(args):
     date_struct = time.strptime(match.group(0), "%Y-%m-%d %H:%M:%S")
     ts1 = calendar.timegm(date_struct)
 
+    # Build filename for report file
+    reportfile = re.sub(r"\s+", "_", args.name)
+    reportfile = f"{time.strftime("%Y-%m-%d", date_struct)}_{reportfile}"
+    print(reportfile)
+
     # Build filename for state file
-    md5hash = hashlib.md5((args.dir + args.name).encode()).hexdigest()
-    filename = Path(__file__).resolve().parent / f".tmp_{md5hash}"
+    md5hash = hashlib.md5((args.scandir + args.name).encode()).hexdigest()
+    statefile = Path(__file__).resolve().parent / f".tmp_{md5hash}"
 
     # If current timestamp and state file timestamp match, do nothing
-    if filename.exists():
-        with open(filename, "r", encoding="utf-8") as file:
+    if statefile.exists():
+        with open(statefile, "r", encoding="utf-8") as file:
             ts2 = int(file.read())
 
         if ts1 == ts2:
@@ -102,7 +108,7 @@ def wrapper(args):
     # If state file does not exist or timestamps did not match, generate report
     attachments = []
     for file_format in args.format:
-        cmd = ["python3", str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity)]
+        cmd = [sys.executable, str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity), "--filename", reportfile]
         logging.debug("Executing <%s>", " ".join(cmd))
 
         try:
@@ -118,7 +124,7 @@ def wrapper(args):
     send_mail(attachments)
 
     # Write timestamp in state file
-    with open(filename, "w", encoding="utf-8") as file:
+    with open(statefile, "w", encoding="utf-8") as file:
         file.write(str(ts1))
 
 
@@ -142,7 +148,7 @@ def main():
         help="Scan name"
     )
     parser.add_argument(
-        "--dir",
+        "--scandir",
         help="Scan directory",
         default="My Scans"
     )
