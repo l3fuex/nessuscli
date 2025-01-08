@@ -173,8 +173,8 @@ def report(args, config):
     folders, scans = api.scan_list()
     scanid, status = get_scanid(args.dir, args.name, folders, scans)
 
-    if status == "running":
-        logging.error("Scan is still running!")
+    if status != "completed":
+        logging.error("Scan is not completed yet!")
         raise SystemExit(1)
 
     # Trigger report generation
