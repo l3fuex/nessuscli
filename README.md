@@ -28,6 +28,8 @@ As of now nessuscli comes with two main modes: **scan** and **report**. **scan**
 ```bash
 python3 nessuscli.py scan "Test Scan" --status
 python3 nessuscli.py scan "Test Scan" --last-scanned
+python3 nessuscli.py scan "Test Scan" --targets
+python3 nessuscli.py scan "Test Scan" --vulnstats
 
 python3 nessuscli.py report "Test Scan"
 python3 nessuscli.py report "Test Scan" --format pdf
@@ -39,5 +41,5 @@ You can schedule report generation by adding a crontab entry which executes the 
 ```bash
 # Add a crontab entry to schedule the wrapper execution
 conrtab -l
-*/5 * * * * /usr/bin/python3 ~/nessuscli/wrapper.py "Test Scan" --format pdf,csv --severity high,critical > /dev/null 2>&1
+*/5 * * * * /usr/bin/python3 ~/nessuscli/wrapper.py "Test Scan" --format pdf,csv --severity high,critical --type vuln_by_plugin> /dev/null 2>&1
 ```
