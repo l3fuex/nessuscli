@@ -135,6 +135,7 @@ def wrapper(args):
     attachments = []
     for file_format in args.format:
         cmd = [sys.executable, str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity), "--type", args.type, "--filename", reportfile]
+        print(cmd)
         logging.debug("Executing <%s>", " ".join(cmd))
 
         try:
@@ -220,7 +221,7 @@ def main():
         "--type",
         choices=["vuln_hosts_summary", "vuln_by_host", "compliance_exec", "remediations", "vuln_by_plugin", "compliance"],
         help="Report type",
-        default=["vuln_by_plugin"]
+        default="vuln_by_plugin"
     )
     parser.add_argument(
         "--severity",

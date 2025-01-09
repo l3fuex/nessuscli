@@ -306,7 +306,7 @@ def main():
         "--type",
         choices=["vuln_hosts_summary", "vuln_by_host", "compliance_exec", "remediations", "vuln_by_plugin", "compliance"],
         help="Report type",
-        default=["vuln_by_plugin"]
+        default="vuln_by_plugin"
     )
     report_parser.add_argument(
         "--severity",
