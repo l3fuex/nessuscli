@@ -134,7 +134,7 @@ def wrapper(args):
     # If state file does not exist or timestamps did not match, generate report
     attachments = []
     for file_format in args.format:
-        cmd = [sys.executable, str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity), "--filename", reportfile]
+        cmd = [sys.executable, str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity), "--type", args.type, "--filename", reportfile]
         logging.debug("Executing <%s>", " ".join(cmd))
 
         try:
