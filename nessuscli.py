@@ -121,7 +121,7 @@ class NessusAPI:
             filepath = Path(__file__).resolve().parent
         else:
             filepath = Path(filepath)
-        
+
         # Check if path is valid
         if not filepath.is_dir():
             logging.error("Folder \"%s\" does not exist!", filepath)
@@ -232,6 +232,35 @@ def scan(args, config):
             ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(ts))
             print(f"{ts}")
 
+    if args.targets:
+        details = api.scan_details(scanid)
+
+        if "targets" in details["info"]:
+            print(f"{details["info"]["targets"]}")
+
+    if args.vulnstats:
+        details = api.scan_details(scanid)
+
+        if "vulnerabilities" in details:
+            info = low = medium = high = critical = 0
+            for vuln in details["vulnerabilities"]:
+                if vuln["severity"] == 0:
+                    info += int(vuln["count"])
+                if vuln["severity"] == 1:
+                    low += int(vuln["count"])
+                if vuln["severity"] == 2:
+                    medium += int(vuln["count"])
+                if vuln["severity"] == 3:
+                    high += int(vuln["count"])
+                if vuln["severity"] == 4:
+                    critical += int(vuln["count"])
+
+        print(f"critical: {critical}")
+        print(f"high:     {high}")
+        print(f"medium:   {medium}")
+        print(f"low:      {low}")
+        print(f"info:     {info}")
+
 
 def main():
     def create_type_handler(allowed_values):
@@ -318,6 +347,16 @@ def main():
     group.add_argument(
         "--last-scanned",
         help="Timestamp of last scan (UTC)",
+        action="store_true"
+    )
+    group.add_argument(
+        "--targets",
+        help="List of target IPs / Networks",
+        action="store_true"
+    )
+    group.add_argument(
+        "--vulnstats",
+        help="Vulnerability statistics",
         action="store_true"
     )
     scan_parser.set_defaults(func=scan)

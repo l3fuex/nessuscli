@@ -13,12 +13,46 @@ import configparser
 import sys
 
 logging.basicConfig(
-    level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
-#    level=logging.INFO, format="%(levelname)-8s %(message)s"
+#    level=logging.DEBUG, format="%(levelname)-8s %(funcName)s:%(lineno)d - %(message)s"
+    level=logging.INFO, format="%(levelname)-8s %(message)s"
 )
 
 
-def send_mail(attachments):
+def exec_cmd(cmd):
+    logging.debug("Executing <%s>", " ".join(cmd))
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logging.debug("Output: \n%s", result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        logging.error("Command failed: %s", e.stderr.strip())
+    except Exception as e:
+        logging.error("Unexpected error while executing command: %s", e)
+
+    return result.stdout
+
+
+def build_body(severity, targets, vulnstats):
+    body = f"""
+        The attached report(s) contain vulnerabilities of the following severity level(s):
+        {", ".join(severity).strip("\n")}
+
+        The following targets have been scanned:
+        {targets.rstrip("\n")}
+
+        Summary of found vulnerabilities:
+        {vulnstats.rstrip("\n")}
+    """
+
+    # Remove leading whitespaces in f-string
+    lines = body.splitlines()
+    text = [line.lstrip() for line in lines]
+    body = "\n".join(text)
+
+    return body.rstrip("\n")
+
+
+def send_mail(subject, body, attachments=None):
     mimetypes.add_type("application/xml", ".nessus")
 
     config = configparser.ConfigParser()
@@ -32,17 +66,18 @@ def send_mail(attachments):
     msg = EmailMessage()
     msg["From"] = from_addr
     msg["To"] = rcpt_addr
-    msg["Subject"] = "Nessus Report"
-    msg.set_content("Nessus Report")
+    msg["Subject"] = subject
+    msg.set_content(body)
 
-    for attachment in attachments:
-        file_path = Path(attachment).resolve()
-        mimetype, _ = mimetypes.guess_type(file_path)
-        maintype, subtype = mimetype.split("/")
-        logging.debug("Attaching file \"%s\" with mimetype \"%s\" and subtype \"%s\"", file_path.name, mimetype, subtype)
-        with open(file_path, "rb") as file:
-            file_data = file.read()
-            msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=file_path.name)
+    if attachments:
+        for attachment in attachments:
+            file_path = Path(attachment).resolve()
+            mimetype, _ = mimetypes.guess_type(file_path)
+            maintype, subtype = mimetype.split("/")
+            logging.debug("Attaching file \"%s\" with mimetype \"%s\" and subtype \"%s\"", file_path.name, mimetype, subtype)
+            with open(file_path, "rb") as file:
+                file_data = file.read()
+                msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=file_path.name)
 
     try:
         with smtplib.SMTP(server, port) as server:
@@ -66,21 +101,13 @@ def wrapper(args):
 
     # Get timestamp of last scan
     cmd = [sys.executable, str(nessuscli.resolve()), "scan", args.name, "--last-scanned"]
-    logging.debug("Executing <%s>", " ".join(cmd))
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        logging.debug("Output: %s", result.stdout.strip())
-    except subprocess.CalledProcessError as e:
-        logging.error("Command failed: %s", e.stderr.strip())
-    except Exception as e:
-        logging.error("Unexpected error while executing command: %s", e)
+    result = exec_cmd(cmd)
 
     # Check stdout for correct date format (e.g. 2024-01-01 06:00:00)
     pattern = r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
-    match = re.match(pattern, result.stdout)
+    match = re.match(pattern, result)
     if not match:
-        logging.debug("No date detected in output: \"%s\"", result.stdout)
+        logging.debug("No date detected in output: \"%s\"", result)
         raise SystemExit
 
     # Convert date string to unix timestamp format
@@ -119,8 +146,27 @@ def wrapper(args):
         except Exception as e:
             logging.error("Unexpected error while executing command: %s", e)
 
-    # Send mail
-    send_mail(attachments)
+    # Build mail subject
+    subject = f"[Nessus Scan Report] {args.name} // {time.strftime("%Y-%m-%d", date_struct)}"
+
+    # Build mail body
+    cmd = [sys.executable, str(nessuscli.resolve()), "scan", args.name, "--targets"]
+    targets = exec_cmd(cmd)
+    cmd = [sys.executable, str(nessuscli.resolve()), "scan", args.name, "--vulnstats"]
+    vulnstats = exec_cmd(cmd)
+    #body = build_body(args.severity, targets, vulnstats)
+    body = ""
+    body += "The attached report(s) contain vulnerabilities of the following severity level(s):\n"
+    body += ", ".join(args.severity)
+    body += "\n\n"
+    body += "The following targets have been scanned:\n"
+    body += targets
+    body += "\n"
+    body += "Summary of found vulnerabilities:\n"
+    body += vulnstats
+
+    # Send report(s) via mail
+    send_mail(subject, body, attachments)
 
     # Write timestamp in state file
     with open(statefile, "w", encoding="utf-8") as file:
