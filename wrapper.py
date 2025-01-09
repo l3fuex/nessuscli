@@ -32,26 +32,6 @@ def exec_cmd(cmd):
     return result.stdout
 
 
-def build_body(severity, targets, vulnstats):
-    body = f"""
-        The attached report(s) contain vulnerabilities of the following severity level(s):
-        {", ".join(severity).strip("\n")}
-
-        The following targets have been scanned:
-        {targets.rstrip("\n")}
-
-        Summary of found vulnerabilities:
-        {vulnstats.rstrip("\n")}
-    """
-
-    # Remove leading whitespaces in f-string
-    lines = body.splitlines()
-    text = [line.lstrip() for line in lines]
-    body = "\n".join(text)
-
-    return body.rstrip("\n")
-
-
 def send_mail(subject, body, attachments=None):
     mimetypes.add_type("application/xml", ".nessus")
 
@@ -155,7 +135,7 @@ def wrapper(args):
     targets = exec_cmd(cmd)
     cmd = [sys.executable, str(nessuscli.resolve()), "scan", args.name, "--vulnstats"]
     vulnstats = exec_cmd(cmd)
-    #body = build_body(args.severity, targets, vulnstats)
+ 
     body = ""
     body += "The attached report(s) contain vulnerabilities of the following severity level(s):\n"
     body += ", ".join(args.severity)
