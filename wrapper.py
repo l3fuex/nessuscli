@@ -115,7 +115,6 @@ def wrapper(args):
     attachments = []
     for file_format in args.format:
         cmd = [sys.executable, str(nessuscli.resolve()), "report", args.name, "--format", file_format, "--severity", ",".join(args.severity), "--type", args.type, "--filename", reportfile]
-        print(cmd)
         logging.debug("Executing <%s>", " ".join(cmd))
 
         try:
