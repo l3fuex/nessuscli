@@ -40,6 +40,5 @@ python3 nessuscli.py report "Test Scan" --format pdf --severity high,critical --
 You can schedule report generation by adding a crontab entry which executes the wrapper like every 5 minutes. The example outlined below sends reports, only including findings with a severity of "high" or "critical", in the format "pdf" and "csv".
 ```bash
 # Add a crontab entry to schedule the wrapper execution
-conrtab -l
 */5 * * * * /usr/bin/python3 ~/nessuscli/wrapper.py "Test Scan" --format pdf,csv --severity high,critical --type vuln_by_plugin> /dev/null 2>&1
 ```
