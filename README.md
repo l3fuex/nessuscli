@@ -44,4 +44,4 @@ You can schedule report generation by adding a crontab entry which executes the 
 ```
 
 ## License
-This script is provided under the [Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license.
+This software is provided under the [Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license.
