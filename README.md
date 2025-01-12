@@ -42,3 +42,6 @@ You can schedule report generation by adding a crontab entry which executes the 
 # Add a crontab entry to schedule the wrapper execution
 */5 * * * * /usr/bin/python3 ~/nessuscli/wrapper.py "Test Scan" --format pdf,csv --severity high,critical --type vuln_by_plugin> /dev/null 2>&1
 ```
+
+## License
+This script is provided under the [Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license.
