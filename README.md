@@ -20,7 +20,7 @@ vi nessuscli/config.ini
 
 # Make the script executable
 chmod +x nessuscli/*.py
-````
+```
 
 ## Usage
 
